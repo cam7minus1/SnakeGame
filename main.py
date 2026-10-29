@@ -45,8 +45,14 @@ def update_board(cells):
             cell_type = cells[x][y]
 
             # Check if cell is a valid place to spawn food
-            if cell_type == empty_tag and do_spawn_food:
-                cells[x][y] = food_tag
+            # Skip empty that are not set to spawn food
+            if cell_type == empty_tag:
+                if do_spawn_food:
+                    cells[x][y] = food_tag
+                else:
+                    continue
+
+            # Handle snake portions
 
 initialize_board()
 
