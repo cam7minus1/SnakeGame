@@ -4,15 +4,19 @@ import random
 board_size_x = 30
 board_size_y = 20
 food_chance = 5000
+food_count = 0
+max_food = 5
+
+window_width = 450
+window_height = 300
+snake_size = 1
+padding = 0
+
 empty_tag = "EMPTY"
 food_tag = "FOOD"
 snake_tail_tag = "TAIL"
 snake_head_tag = "HEAD"
-window_width = 450
-window_height = 300
-snake_size = 1
 direction = "x+"
-padding = 0.01
 
 pygame.init()
 
@@ -36,12 +40,7 @@ def get_next_cell_indicies(cell_x, cell_y, direction):
     elif direction == "y-":
         next_cell_y -= 1
 
-    if next_cell_x < 0 or next_cell_x > board_size_x:
-        return
-    elif next_cell_y < 0 or next_cell_y > board_size_y:
-        return
-    else:
-        return next_cell_x, next_cell_y
+    return next_cell_x, next_cell_y
 
 def draw_square(color_tuple, udim_tuple):
     # color_tuple = (R [0-255], B, G)
@@ -83,24 +82,40 @@ def initialize_board():
     return cells
 
 def do_spawn_food():
-    if random.randint(1, food_chance) == 1:
+    global food_count, max_food
+
+    if food_count > max_food:
         return False
+
+    if random.randint(1, food_chance) == 1:
+        food_count += 1
+        return True
     else:
         return False
 
 def update_board(cells):
+
+    global snake_size, food_count, max_food
+
     # Iterate through all cells
+    updated_coords = {}
+
     for x in range(0, board_size_x):
         for y in range(0, board_size_y):
-
             # Extract cell type
             cell = cells[x][y]
+
+            # Skip already updated cells
+            update_tag = str(x)+"_"+str(y)
+            if update_tag in updated_coords:
+                continue
 
             # Check if cell is a valid place to spawn food
             # Skip empty that are not set to spawn food
             if cell["cell_type"] == empty_tag:
                 if do_spawn_food():
                     cells[x][y]["cell_type"] = food_tag
+                    updated_coords[update_tag] = True
                 else:
                     continue
 
@@ -109,11 +124,30 @@ def update_board(cells):
             if cell["cell_type"] == snake_head_tag:
                 cell["cell_type"] = snake_tail_tag
                 cell["order"] = 1 # Default to 1
-                n_x, n_y = get_next_cell_indicies()
+                updated_coords[update_tag] = True
+                n_x, n_y = get_next_cell_indicies(x, y, direction)
 
-                if n_x is None or n_y is None:
+                # Kill if hit out of bounds
+                if n_x < 0 or n_x > board_size_x - 1 or n_y < 0 or n_y > board_size_y - 1:
                     print("You lose!")
                     return False
+
+                # Find out what the next cell is
+                selected_cell = cells[n_x][n_y]
+
+                # If the next cell is food increase size
+                if selected_cell["cell_type"] == food_tag:
+                    snake_size += 1
+                    food_count -= 1
+
+                # If next cell is snake tail end
+                if selected_cell["cell_type"] == snake_tail_tag:
+                    print("You lose!")
+                    return False
+
+                # Update next cell as snake head
+                selected_cell["cell_type"] = snake_head_tag
+                updated_coords[str(n_x)+"_"+str(n_y)] = True
 
             if cell["cell_type"] == snake_tail_tag:
 
@@ -123,12 +157,12 @@ def update_board(cells):
                 else:
                 # if greater than size set to empty
                     cell["cell_type"] = empty_tag
+                    updated_coords[update_tag] = True
                     cell["order"] = None
 
     return cells
 
 cells = initialize_board()
-
 clock = pygame.time.Clock()
 
 while is_running:
@@ -139,27 +173,27 @@ while is_running:
             is_running = False
         if event.type == pygame.KEYDOWN:
             key = pygame.key.name(event.key)
-            if key == "w":
-                direction = "y+"
-            elif key == "s":
+            if key == "w" and direction != "y+":
                 direction = "y-"
-            elif key == "a":
+            elif key == "s" and direction != "y-":
+                direction = "y+"
+            elif key == "a" and direction != "x+":
                 direction = "x-"
-            elif key == "d":
+            elif key == "d" and direction != "x-":
                 direction = "x+"
 
-    clock.tick(2)
+    # Ten frames per second
+    clock.tick(10)
 
     # Fill the screen
     screen.fill((200, 200, 200))
-    
 
     cells = update_board(cells)
     if cells is False:
         print(f"Game Over! Reached length: {snake_size}")
         is_running = False
-
-    draw_board(cells)
+    else:
+        draw_board(cells)
 
     # Draw all the items requested to draw
     pygame.display.flip()
